@@ -79,7 +79,7 @@ func parseTitleNode(node *html.Node, article *Article) {
 			if node.Type == html.ElementNode && strings.Contains(node.Data, "small") {
 				article.smallTitle = text
 			} else {
-				article.title = text
+				article.title += text
 			}
 		}
 		parseTitleNode(child, article)
