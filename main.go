@@ -14,6 +14,7 @@ type Article struct {
 	smallTitle string
 	title      string
 	pageLink   string
+	leadText   string
 }
 
 var (
@@ -29,6 +30,9 @@ func (a *Article) Print() {
 
 	}
 	titleColor.Println(a.title)
+	if a.leadText != "" {
+		smallTitleColor.Println(a.leadText)
+	}
 }
 
 func nodeTypeStr(t html.NodeType) string {
@@ -62,15 +66,19 @@ func printNodeTree(root *html.Node, indent int) {
 	}
 }
 
-func parseTitleNode(node *html.Node, article *Article) {
+func cleanData(data string) string {
+	cleanedData := strings.TrimSpace(data)
+	cleanedData = strings.ReplaceAll(cleanedData, "\n", "")
+	cleanedData = strings.ReplaceAll(cleanedData, "\u2013", " \u2013 ")
+	cleanedData = strings.ReplaceAll(cleanedData, "\u00ad", "")
+	return cleanedData
+}
+
+func parseTitleText(node *html.Node, article *Article) {
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 
 		if child.Type == html.TextNode {
-			cleanedData := strings.TrimSpace(child.Data)
-			cleanedData = strings.ReplaceAll(cleanedData, "\n", "")
-			cleanedData = strings.ReplaceAll(cleanedData, "\u2013", " \u2013 ")
-			cleanedData = strings.ReplaceAll(cleanedData, "\u00ad", "")
-			text := cleanedData
+			text := cleanData(child.Data)
 
 			if text == "" {
 				continue
@@ -82,7 +90,23 @@ func parseTitleNode(node *html.Node, article *Article) {
 				article.title += text
 			}
 		}
-		parseTitleNode(child, article)
+		parseTitleText(child, article)
+	}
+}
+
+func parseLeadText(node *html.Node, article *Article) {
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+
+		if child.Type == html.TextNode {
+			text := cleanData(child.Data)
+
+			if text == "" {
+				continue
+			}
+
+			article.leadText += text
+		}
+		parseLeadText(child, article)
 	}
 }
 
@@ -94,7 +118,10 @@ func parseArticle(root *html.Node, article *Article) bool {
 				article.pageLink = attr.Val
 			}
 			if attr.Key == "class" && strings.Contains(attr.Val, "kur-room__title") {
-				parseTitleNode(child, article)
+				parseTitleText(child, article)
+			}
+			if attr.Key == "class" && strings.Contains(attr.Val, "kur-room__leadtext") {
+				parseLeadText(child, article)
 			}
 
 		}
@@ -147,6 +174,7 @@ func main() {
 
 	// printNodeTree(root, 0)
 	articles := parseArticles(root)
+
 	fmt.Printf("%v articles found\n\n", len(articles))
 	for _, article := range articles {
 		article.Print()
