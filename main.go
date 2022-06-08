@@ -159,7 +159,7 @@ func parseArticles(root *html.Node) []Article {
 
 func main() {
 	fmt.Println("fetching...")
-	resp, err := http.Get("https://nrk.no")
+	resp, err := http.Get("https://www.nrk.no")
 	if err != nil {
 		logrus.Error("Could not fetch nrk.no:", err)
 		return
