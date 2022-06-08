@@ -135,12 +135,14 @@ func main() {
 	resp, err := http.Get("https://nrk.no")
 	if err != nil {
 		logrus.Error("Could not fetch nrk.no:", err)
+		return
 	}
 	defer resp.Body.Close()
 
 	root, err := html.Parse(resp.Body)
 	if err != nil {
 		logrus.Error("error parsing response:", err)
+		return
 	}
 
 	// printNodeTree(root, 0)
