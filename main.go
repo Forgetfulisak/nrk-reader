@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +11,14 @@ import (
 	"golang.org/x/net/html"
 )
 
+var (
+	debug = flag.Bool("d", false, "prints the parsed html from nrk")
+
+	titleColor      = color.New(color.FgWhite, color.Bold)
+	smallTitleColor = color.New(color.FgWhite)
+	linkColor       = color.New(color.FgBlue)
+)
+
 type Article struct {
 	smallTitle string
 	title      string
@@ -17,19 +26,15 @@ type Article struct {
 	leadText   string
 }
 
-var (
-	titleColor      = color.New(color.FgWhite, color.Bold)
-	smallTitleColor = color.New(color.FgWhite)
-	linkColor       = color.New(color.FgBlue)
-)
-
 func (a *Article) Print() {
 	linkColor.Println(a.pageLink)
+
 	if a.smallTitle != "" {
 		smallTitleColor.Println(a.smallTitle)
-
 	}
+
 	titleColor.Println(a.title)
+
 	if a.leadText != "" {
 		smallTitleColor.Println(a.leadText)
 	}
@@ -80,10 +85,6 @@ func parseTitleText(node *html.Node, article *Article) {
 		if child.Type == html.TextNode {
 			text := cleanData(child.Data)
 
-			if text == "" {
-				continue
-			}
-
 			if node.Type == html.ElementNode && strings.Contains(node.Data, "small") {
 				article.smallTitle = text
 			} else {
@@ -99,11 +100,6 @@ func parseLeadText(node *html.Node, article *Article) {
 
 		if child.Type == html.TextNode {
 			text := cleanData(child.Data)
-
-			if text == "" {
-				continue
-			}
-
 			article.leadText += text
 		}
 		parseLeadText(child, article)
@@ -158,6 +154,8 @@ func parseArticles(root *html.Node) []Article {
 }
 
 func main() {
+	flag.Parse()
+
 	fmt.Println("fetching...")
 	resp, err := http.Get("https://www.nrk.no")
 	if err != nil {
@@ -172,12 +170,17 @@ func main() {
 		return
 	}
 
-	// printNodeTree(root, 0)
+	if *debug {
+		printNodeTree(root, 0)
+		return
+	}
+
 	articles := parseArticles(root)
 
 	fmt.Printf("%v articles found\n\n", len(articles))
+	fmt.Println("press enter to read the next article")
 	for _, article := range articles {
-		article.Print()
 		fmt.Scanln()
+		article.Print()
 	}
 }
