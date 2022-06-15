@@ -87,9 +87,6 @@ func StoreNews(file string, news StoredNews) error {
 	// writing new news to disk
 	backup := file + ".bak"
 	err := os.Rename(file, backup)
-	if err == nil {
-		defer os.Remove(backup)
-	}
 
 	f, err := os.Create(file)
 	if err != nil {
@@ -103,6 +100,8 @@ func StoreNews(file string, news StoredNews) error {
 		return err
 	}
 
+	// Only remove backup if everything succeeded
+	os.Remove(backup)
 	return nil
 }
 
