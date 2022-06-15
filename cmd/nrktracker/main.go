@@ -28,7 +28,6 @@ type StoredNews = []StoredArticle
 func DBFile() (string, error) {
 
 	home, err := os.UserHomeDir()
-	home = "."
 	if err != nil {
 		return "", err
 	}
