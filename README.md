@@ -5,5 +5,5 @@ Playing around with scraping articles from nrk.no. Will list all headlines and l
 ## Usage
 
 ```
-$ go run .
+$ go run ./cmd/nrkreader
 ```

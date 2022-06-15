@@ -1,42 +1,37 @@
-package main
+package nrk
 
 import (
-	"flag"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/html"
 )
 
 var (
-	debug = flag.Bool("d", false, "prints the parsed html from nrk")
-
 	titleColor      = color.New(color.FgWhite, color.Bold)
 	smallTitleColor = color.New(color.FgWhite)
 	linkColor       = color.New(color.FgBlue)
 )
 
 type Article struct {
-	smallTitle string
-	title      string
-	pageLink   string
-	leadText   string
+	SmallTitle string
+	Title      string
+	PageLink   string
+	LeadText   string
 }
 
 func (a *Article) Print() {
-	linkColor.Println(a.pageLink)
+	linkColor.Println(a.PageLink)
 
-	if a.smallTitle != "" {
-		smallTitleColor.Println(a.smallTitle)
+	if a.SmallTitle != "" {
+		smallTitleColor.Println(a.SmallTitle)
 	}
 
-	titleColor.Println(a.title)
+	titleColor.Println(a.Title)
 
-	if a.leadText != "" {
-		smallTitleColor.Println(a.leadText)
+	if a.LeadText != "" {
+		smallTitleColor.Println(a.LeadText)
 	}
 }
 
@@ -61,13 +56,13 @@ func nodeTypeStr(t html.NodeType) string {
 	}
 }
 
-func printNodeTree(root *html.Node, indent int) {
+func PrintNodeTree(root *html.Node, indent int) {
 	escapedData := strings.ReplaceAll(root.Data, "\n", "\\n")
 
 	fmt.Printf("%s%v, \"%v\" %v\n", strings.Repeat("\t", indent), nodeTypeStr(root.Type), escapedData, root.Attr)
 
 	for child := root.FirstChild; child != nil; child = child.NextSibling {
-		printNodeTree(child, indent+1)
+		PrintNodeTree(child, indent+1)
 	}
 }
 
@@ -86,9 +81,9 @@ func parseTitleText(node *html.Node, article *Article) {
 			text := cleanData(child.Data)
 
 			if node.Type == html.ElementNode && strings.Contains(node.Data, "small") {
-				article.smallTitle = text
+				article.SmallTitle = text
 			} else {
-				article.title += text
+				article.Title += text
 			}
 		}
 		parseTitleText(child, article)
@@ -100,7 +95,7 @@ func parseLeadText(node *html.Node, article *Article) {
 
 		if child.Type == html.TextNode {
 			text := cleanData(child.Data)
-			article.leadText += text
+			article.LeadText += text
 		}
 		parseLeadText(child, article)
 	}
@@ -111,7 +106,7 @@ func parseArticle(root *html.Node, article *Article) bool {
 	for child := root.FirstChild; child != nil; child = child.NextSibling {
 		for _, attr := range child.Attr {
 			if attr.Key == "href" {
-				article.pageLink = attr.Val
+				article.PageLink = attr.Val
 			}
 			if attr.Key == "class" && strings.Contains(attr.Val, "kur-room__title") {
 				parseTitleText(child, article)
@@ -132,13 +127,13 @@ func _parseArticles(root *html.Node, articles *[]Article) {
 
 			if attr.Key == "id" && strings.Contains(attr.Val, "kur-room-id") {
 				article := Article{
-					smallTitle: "",
-					title:      "",
-					pageLink:   "",
+					SmallTitle: "",
+					Title:      "",
+					PageLink:   "",
 				}
 
 				parseArticle(child, &article)
-				if article.title != "" {
+				if article.Title != "" {
 					*articles = append(*articles, article)
 				}
 			}
@@ -147,40 +142,8 @@ func _parseArticles(root *html.Node, articles *[]Article) {
 	}
 }
 
-func parseArticles(root *html.Node) []Article {
+func ParseArticles(root *html.Node) []Article {
 	out := make([]Article, 0)
 	_parseArticles(root, &out)
 	return out
-}
-
-func main() {
-	flag.Parse()
-
-	fmt.Println("fetching...")
-	resp, err := http.Get("https://www.nrk.no")
-	if err != nil {
-		logrus.Error("Could not fetch nrk.no:", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	root, err := html.Parse(resp.Body)
-	if err != nil {
-		logrus.Error("error parsing response:", err)
-		return
-	}
-
-	if *debug {
-		printNodeTree(root, 0)
-		return
-	}
-
-	articles := parseArticles(root)
-
-	fmt.Printf("%v articles found\n\n", len(articles))
-	fmt.Println("press enter to read the next article")
-	for _, article := range articles {
-		fmt.Scanln()
-		article.Print()
-	}
 }
