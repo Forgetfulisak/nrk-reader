@@ -2,6 +2,7 @@ package nrk
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/fatih/color"
@@ -15,10 +16,10 @@ var (
 )
 
 type Article struct {
-	SmallTitle string
-	Title      string
-	PageLink   string
-	LeadText   string
+	SmallTitle string `json:"smalltitle"`
+	Title      string `json:"title"`
+	PageLink   string `json:"pagelink"`
+	LeadText   string `json:"leadtext"`
 }
 
 func (a *Article) Print() {
@@ -33,6 +34,10 @@ func (a *Article) Print() {
 	if a.LeadText != "" {
 		smallTitleColor.Println(a.LeadText)
 	}
+}
+
+func (a *Article) Equal(other *Article) bool {
+	return *a == *other 
 }
 
 func nodeTypeStr(t html.NodeType) string {
@@ -146,4 +151,20 @@ func ParseArticles(root *html.Node) []Article {
 	out := make([]Article, 0)
 	_parseArticles(root, &out)
 	return out
+}
+
+func FetchArticles() ([]Article, error) {
+	resp, err := http.Get("https://www.nrk.no")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	root, err := html.Parse(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	articles := ParseArticles(root)
+	return articles, nil
 }
