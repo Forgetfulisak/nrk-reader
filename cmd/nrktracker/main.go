@@ -20,7 +20,7 @@ const (
 
 type StoredArticle struct {
 	nrk.Article
-	Seen time.Time `json:"seen"`
+	Seen []time.Time `json:"seen"`
 }
 
 type StoredNews = []StoredArticle
@@ -28,6 +28,7 @@ type StoredNews = []StoredArticle
 func DBFile() (string, error) {
 
 	home, err := os.UserHomeDir()
+	home = "."
 	if err != nil {
 		return "", err
 	}
@@ -96,8 +97,7 @@ func StoreNews(file string, news StoredNews) error {
 	}
 	defer f.Close()
 
-	// fmt.Println("storing to...", file, len(news))
-	fmt.Println("storing to...", file, len(news))
+	fmt.Printf("storing to %s. Currently %d unique articles\n", file, len(news))
 	err = encode(f, news)
 	if err != nil {
 		return err
@@ -106,42 +106,38 @@ func StoreNews(file string, news StoredNews) error {
 	return nil
 }
 
-func toStoredNews(articles []nrk.Article) StoredNews {
-	out := make(StoredNews, 0)
-
-	for _, article := range articles {
-		stored := StoredArticle{
-			Article: article,
-			Seen:    time.Now().Truncate(24 * time.Hour),
-		}
-		out = append(out, stored)
-	}
-
-	return out
-}
-
-func removeDuplicateNews(news StoredNews) StoredNews {
-
-	slices.SortFunc(news, func(a, b StoredArticle) bool {
-		if a.Title == b.Title {
-			return a.Seen.Before(b.Seen)
-		}
+// Mutates oldNews
+func addArticles(oldNews *StoredNews, newArticles []nrk.Article) StoredNews {
+	slices.SortFunc(*oldNews, func(a, b StoredArticle) bool {
 		return a.Title < b.Title
 	})
 
-	out := make(StoredNews, 0, len(news))
-
-	var previous StoredArticle
-	for _, article := range news {
-		// Ignore duplcate articles
-		if article.Equal(&previous.Article) {
-			continue
+	curTime := time.Now().Truncate(24 * time.Hour)
+	for _, article := range newArticles {
+		newArticle := StoredArticle{
+			Article: article,
+			Seen:    []time.Time{curTime},
 		}
-		out = append(out, article)
-		previous = article
+		dupIdx, found := slices.BinarySearchFunc(*oldNews, newArticle, func(a, b StoredArticle) int {
+			if a.Title == b.Title {
+				return 0
+			} else if a.Title < b.Title {
+				return -1
+			} else {
+				return 1
+			}
+		})
+
+		if found {
+			if !slices.Contains((*oldNews)[dupIdx].Seen, curTime) {
+				(*oldNews)[dupIdx].Seen = append((*oldNews)[dupIdx].Seen, curTime)
+			}
+		} else {
+			(*oldNews) = append((*oldNews), newArticle)
+		}
 	}
 
-	return out
+	return *oldNews
 }
 
 func main() {
@@ -153,12 +149,9 @@ func main() {
 	old := ReadOldNews(file)
 
 	newArticles, err := nrk.FetchArticles()
-	newNews := toStoredNews(newArticles)
-	allNews := append(old, newNews...)
+	allNews := addArticles(&old, newArticles)
 
-	withoutDuplicates := removeDuplicateNews(allNews)
-
-	err = StoreNews(file, withoutDuplicates)
+	err = StoreNews(file, allNews)
 
 	if err != nil {
 		log.Fatalln("error storing the news. ", err)
