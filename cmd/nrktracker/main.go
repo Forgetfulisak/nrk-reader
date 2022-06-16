@@ -71,6 +71,7 @@ func ReadOldNews(file string) StoredNews {
 
 		return nil
 	}
+
 	var news StoredNews
 	err = decode(f, &news)
 	if err != nil {
@@ -85,10 +86,13 @@ func StoreNews(file string, news StoredNews) error {
 	// In case something goes wrong while
 	// writing new news to disk
 	backup := file + ".bak"
-	err := os.Rename(file, backup)
+	os.Rename(file, backup)
 
 	f, err := os.Create(file)
 	if err != nil {
+		// Could not create new file.
+		// Replace backup and abort
+		os.Rename(backup, file)
 		return err
 	}
 	defer f.Close()
@@ -96,6 +100,9 @@ func StoreNews(file string, news StoredNews) error {
 	fmt.Printf("storing to %s. Currently %d unique articles\n", file, len(news))
 	err = encode(f, news)
 	if err != nil {
+		// Could not write new data.
+		// Replace file with backup and abort
+		os.Rename(backup, file)
 		return err
 	}
 
@@ -147,11 +154,14 @@ func main() {
 	old := ReadOldNews(file)
 
 	newArticles, err := nrk.FetchArticles()
+	if err != nil {
+		log.Fatalln("error fetching news:", err)
+	}
+
 	allNews := addArticles(&old, newArticles)
 
 	err = StoreNews(file, allNews)
-
 	if err != nil {
-		log.Fatalln("error storing the news. ", err)
+		log.Fatalln("error storing the news:", err)
 	}
 }
