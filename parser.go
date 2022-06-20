@@ -37,7 +37,7 @@ func (a *Article) Print() {
 }
 
 func (a *Article) Equal(other *Article) bool {
-	return *a == *other 
+	return *a == *other
 }
 
 func nodeTypeStr(t html.NodeType) string {

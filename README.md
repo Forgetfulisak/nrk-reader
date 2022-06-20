@@ -5,15 +5,13 @@ Playing around with scraping articles from nrk.no. Will list all headlines and l
 ## Usage
 
 ```
-$ go run ./cmd/nrkreader
+$ go run ./cmd/nrk <subcommand>
 ```
 
-# NRKTracker
+## Subcommands
 
-Stores the headlines and day they were seen at `$HOME/.config/nrktracker/news.json.gz`.
-We can track the headlines by running the tracker daily. For instance in a cronjob.
-
-## Usage
-```
-$ go run ./cmd/nrktracker
-```
+- `read`: Display articles on nrk
+- `track`: 
+    Store the headlines and day they were seen at `$HOME/.config/nrktracker/news.json.gz`.
+    We can track the headlines by running the tracker daily. For instance in a cronjob.
+- `analyze`: show the currently tracked articles

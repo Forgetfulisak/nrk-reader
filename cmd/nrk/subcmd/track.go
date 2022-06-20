@@ -1,12 +1,23 @@
-package main
+package subcmd
 
 import (
-	"log"
+	"errors"
 	"nrk-reader"
 	"time"
 
+	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 )
+
+func NewCmdTrack() *cobra.Command {
+	return &cobra.Command{
+		Use:   "track",
+		Short: "Record news currently on nrk.no",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return trackRun()
+		},
+	}
+}
 
 // Mutates oldNews
 func addArticles(oldNews *nrk.StoredNews, newArticles []nrk.Article) nrk.StoredNews {
@@ -42,23 +53,24 @@ func addArticles(oldNews *nrk.StoredNews, newArticles []nrk.Article) nrk.StoredN
 	return *oldNews
 }
 
-func main() {
+func trackRun() error {
 	file, err := nrk.DBFile()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	old := nrk.ReadOldNews(file)
 
 	newArticles, err := nrk.FetchArticles()
 	if err != nil {
-		log.Fatalln("error fetching news:", err)
+		return errors.New("error fetching news: " + err.Error())
 	}
 
 	allNews := addArticles(&old, newArticles)
 
 	err = nrk.StoreNews(file, allNews)
 	if err != nil {
-		log.Fatalln("error storing the news:", err)
+		return errors.New("error storing the news: " + err.Error())
 	}
+	return nil
 }
