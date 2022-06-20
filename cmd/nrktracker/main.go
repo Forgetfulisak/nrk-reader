@@ -1,129 +1,26 @@
 package main
 
 import (
-	"compress/gzip"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"log"
 	"nrk-reader"
-	"os"
 	"time"
 
 	"golang.org/x/exp/slices"
 )
 
-const (
-	DataDir    = ".config/nrktracker"
-	TargetFile = "news.json.gz"
-)
-
-type StoredArticle struct {
-	nrk.Article
-	Seen []time.Time `json:"seen"`
-}
-
-type StoredNews = []StoredArticle
-
-func DBFile() (string, error) {
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	dir := fmt.Sprintf("%s/%s", home, DataDir)
-	err = os.MkdirAll(dir, 0700)
-	if err != nil {
-		return "", err
-	}
-
-	path := fmt.Sprintf("%s/%s", dir, TargetFile)
-	return path, nil
-}
-
-func encode(f *os.File, v any) error {
-	w := gzip.NewWriter(f)
-	defer w.Close()
-
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "\t")
-	err := encoder.Encode(v)
-	return err
-}
-
-func decode(f *os.File, v any) error {
-	w, err := gzip.NewReader(f)
-	if err != nil {
-		return err
-	}
-
-	err = json.NewDecoder(w).Decode(v)
-	return err
-}
-
-func ReadOldNews(file string) StoredNews {
-	f, err := os.Open(file)
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			panic(err)
-		}
-
-		return nil
-	}
-
-	var news StoredNews
-	err = decode(f, &news)
-	if err != nil {
-		log.Fatalln("error reading old news: ", err)
-	}
-
-	return news
-}
-
-func StoreNews(file string, news StoredNews) error {
-
-	// In case something goes wrong while
-	// writing new news to disk
-	backup := file + ".bak"
-	os.Rename(file, backup)
-
-	f, err := os.Create(file)
-	if err != nil {
-		// Could not create new file.
-		// Replace backup and abort
-		os.Rename(backup, file)
-		return err
-	}
-	defer f.Close()
-
-	fmt.Printf("storing to %s. Currently %d unique articles\n", file, len(news))
-	err = encode(f, news)
-	if err != nil {
-		// Could not write new data.
-		// Replace file with backup and abort
-		os.Rename(backup, file)
-		return err
-	}
-
-	// Only remove backup if everything succeeded
-	os.Remove(backup)
-	return nil
-}
-
 // Mutates oldNews
-func addArticles(oldNews *StoredNews, newArticles []nrk.Article) StoredNews {
-	slices.SortFunc(*oldNews, func(a, b StoredArticle) bool {
+func addArticles(oldNews *nrk.StoredNews, newArticles []nrk.Article) nrk.StoredNews {
+	slices.SortFunc(*oldNews, func(a, b nrk.StoredArticle) bool {
 		return a.Title < b.Title
 	})
 
 	curTime := time.Now().Truncate(24 * time.Hour)
 	for _, article := range newArticles {
-		newArticle := StoredArticle{
+		newArticle := nrk.StoredArticle{
 			Article: article,
 			Seen:    []time.Time{curTime},
 		}
-		dupIdx, found := slices.BinarySearchFunc(*oldNews, newArticle, func(a, b StoredArticle) int {
+		dupIdx, found := slices.BinarySearchFunc(*oldNews, newArticle, func(a, b nrk.StoredArticle) int {
 			if a.Title == b.Title {
 				return 0
 			} else if a.Title < b.Title {
@@ -146,12 +43,12 @@ func addArticles(oldNews *StoredNews, newArticles []nrk.Article) StoredNews {
 }
 
 func main() {
-	file, err := DBFile()
+	file, err := nrk.DBFile()
 	if err != nil {
 		panic(err)
 	}
 
-	old := ReadOldNews(file)
+	old := nrk.ReadOldNews(file)
 
 	newArticles, err := nrk.FetchArticles()
 	if err != nil {
@@ -160,7 +57,7 @@ func main() {
 
 	allNews := addArticles(&old, newArticles)
 
-	err = StoreNews(file, allNews)
+	err = nrk.StoreNews(file, allNews)
 	if err != nil {
 		log.Fatalln("error storing the news:", err)
 	}
